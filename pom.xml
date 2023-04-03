@@ -15,5 +15,7 @@
         <module>gulimall-order</module>
         <module>gulimall-product</module>
         <module>gulimall-ware</module>
+        <module>renren-fast-master</module>
+        <module>renren-generator-master</module>
     </modules>
 </project>
