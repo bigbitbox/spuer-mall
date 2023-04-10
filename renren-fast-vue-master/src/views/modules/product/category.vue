@@ -21,7 +21,8 @@
 
 
     <el-tree :data="menus" :props="defaultProps" @node-click="handleNodeClick" :expand-on-click-node="false"
-      :show-checkbox="true" node-key="catId" :default-expanded-keys="expandedKey" :draggable="true" :allow-drop="allowDrop">
+      :show-checkbox="true" node-key="catId" :default-expanded-keys="expandedKey" :draggable="true"
+      :allow-drop="allowDrop" @node-drop="handleDrop">
       <!-- node代表当前结点（是否展开等信息，element-ui自带属性），data是结点数据，是自己的数据。 -->
       <span class="custom-tree-node" slot-scope="{ node, data }">
         <span>{{ node.label }}</span>
@@ -48,6 +49,8 @@ export default {
   name: 'category',
   data() {
     return {
+
+      updateNodes: [], //用来记录拖拽后的节点
       maxLevel: 1, //用来记录当前节点的最大深度
       title: '',//对话框的标题
       dialogType: "",//add,edit
@@ -75,7 +78,83 @@ export default {
 
 
   methods: {
-    
+
+
+
+    //新增方法
+    handleDrop(draggingNode, dropNode, dropType, ev) {
+      console.log("handleDrop: ", draggingNode, dropNode, dropType);
+      //1、当前节点最新父节点的id
+      let pCid = 0;
+      //拖拽后的兄弟节点，分两种情况，一种是拖拽到两侧，一种是拖拽到内部
+      let sibings = null;
+      if (dropType == "before" || dropType == "after") {
+        pCid = dropNode.parent.data.catId == undefined ? 0 : dropNode.parent.data.catId;
+        sibings = dropNode.parent.childNodes;
+      } else {
+        pCid = dropNode.data.catId;
+        sibings = dropNode.childNodes;
+      }
+
+      //2、当前拖拽节点的最新顺序
+      //遍历所有的兄弟节点，如果是拖拽节点，传入（catId，sort，parentCid，catLevel），如果是兄弟节点传入（catId，sort）
+      for (let i = 0; i < sibings.length; i++) {
+        if (sibings[i].data.catId == draggingNode.data.catId) {
+          //如果遍历的是当前正在拖拽的节点
+          let catLevel = draggingNode.level;
+          if (sibings[i].level != draggingNode.level) {
+            //当前节点的层级发生变化
+            catLevel = sibings[i].level;
+            //修改他子节点的层级
+            this.updateChildNodeLevel(sibings[i]);
+          }
+          this.updateNodes.push({ catId: sibings[i].data.catId, sort: i, parentCid: pCid, catLevel: catLevel });
+        } else {
+          this.updateNodes.push({ catId: sibings[i].data.catId, sort: i });
+        }
+
+      }
+
+      //3、当前拖拽节点的最新层级
+      console.log("updateNodes: ", this.updateNodes);
+      this.$http({
+        url: this.$http.adornUrl('/product/category/update/sort'),
+        method: 'post',
+        data: this.$http.adornData(this.updateNodes, false)
+      }).then(({ data }) => {
+        this.$message({
+          message: '菜单顺序修改成功',
+          type: 'success'
+        });
+        //刷新出菜单
+        this.getMenus();
+        //设置默认展开的菜单
+        this.expandedKey = [pCid];
+
+      })
+
+
+      //每次拖拽后把数据清空，否则要修改的节点将会越拖越多
+      this.updateNodes = [],
+        this.maxLevel = 1
+    },
+
+    // 修改拖拽节点的子节点的层级
+    updateChildNodeLevel(node) {
+      if (node.childNodes.length > 0) {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          //遍历子节点，传入（catId，catLevel）
+          var cNode = node.childNodes[i].data;
+          this.updateNodes.push({ catId: cNode.catId, catLevel: node.childNodes[i].level });
+          //处理子节点的子节点
+          this.updateChildNodeLevel(node.childNodes[i]);
+        }
+      }
+    },
+
+
+
+
     //拖动节点定义
     allowDrop(draggingNode, dropNode, type) {
       console.log("allowDrag:", draggingNode, dropNode, type);
@@ -104,6 +183,9 @@ export default {
         }
       }
     },
+
+
+    //拖拽成功后触发的方法
 
 
 
