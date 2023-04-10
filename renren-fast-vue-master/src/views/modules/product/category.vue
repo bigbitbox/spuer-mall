@@ -1,15 +1,21 @@
 <template>
   <div>
-      <!-- 添加分类对话框 -->
-    <el-dialog title="提示" :visible.sync="dialogVisible" width="30%">
+    <!-- 添加分类对话框 -->
+    <el-dialog :title=title :visible.sync="dialogVisible" width="30%" :close-on-click-modal="false">
       <el-form :model="category">
-        <el-form-item label="分类信息" :label-width="formLabelWidth">
+        <el-form-item label="分类信息">
           <el-input v-model="category.name" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="图标">
+          <el-input v-model="category.icon" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="计量单位">
+          <el-input v-model="category.productUnit" autocomplete="off"></el-input>
         </el-form-item>
       </el-form>
       <span slot="footer" class="dialog-footer">
         <el-button @click="dialogVisible = false">取 消</el-button>
-        <el-button type="primary" @click="addCategory">确 定</el-button>
+        <el-button type="primary" @click="submitData">确 定</el-button>
       </span>
     </el-dialog>
 
@@ -23,6 +29,9 @@
           <el-button v-if="node.level <= 2" type="text" size="mini" @click="() => append(data)">
             Append
           </el-button>
+          <el-button type="text" size="mini" @click="() => edit(data)">
+            Edit
+          </el-button>
           <el-button v-if="node.childNodes.length == 0" type="text" size="mini" @click="() => remove(node, data)">
             Delete
           </el-button>
@@ -33,16 +42,23 @@
 </template>
 
 <script>
+import { title } from 'process';
+
 export default {
   name: 'category',
   data() {
     return {
+      title: '',//对话框的标题
+      dialogType: "",//add,edit
       category: {
         name: '',
         parentCid: 0,
         catLevel: 0,
         showStatus: 1,
-        sort: 0
+        sort: 0,
+        catId: null,
+        icon: '',
+        productUnit: ''
       },
       dialogVisible: false,
       expandedKey: [],
@@ -53,23 +69,86 @@ export default {
       }
     };
   },
+
+
+
+
   methods: {
-    //对应三级分类的添加和删除方法
-    append(data) {
+    //提交表单的方法
+    submitData() {
+      if (this.dialogType == "add") {
+        this.addCategory();
+      } else if (this.dialogType == "edit") {
+        this.editCategory();
+      }
+    },
+    //编辑分类的方法
+    editCategory() {
+      //只发送所要修改的数据
+      let { name, catId, icon, productUnit } = this.category;
+      this.$http({
+        url: this.$http.adornUrl('/product/category/update'),
+        method: 'post',
+        data: this.$http.adornData({ name, catId, icon, productUnit }, false)
+      }).then(({ data }) => {
+        this.$message({
+          message: '菜单修改成功',
+          type: 'success'
+        });
+        //关闭对话框
+        this.dialogVisible = false;
+        //刷新出菜单
+        this.getMenus();
+        //设置默认展开的菜单
+        this.expandedKey = [this.category.parentCid];
+        //清空表单
+        this.category.name = '';
+      })
+    },
+
+    //编辑方法（对应按钮）
+    edit(data) {
+      this.title = "编辑分类";
+      this.dialogType = "edit";
       this.dialogVisible = true;
-      console.log("append", data);
+
+      //发送请求获取当前节点最新的数据
+      this.$http({
+        url: this.$http.adornUrl(`/product/category/info/${data.catId}`),
+        method: 'get',
+      }).then(({ data }) => {
+        console.log("要回显的数据", data);
+        this.category.name = data.category.name;
+        this.category.catId = data.category.catId;
+        this.category.icon = data.category.icon;
+        this.category.productUnit = data.category.productUnit;
+        this.category.parentCid = data.category.parentCid;
+      })
+    },
+    //添加方法（对应按钮）
+    append(data) {
+      this.title = "添加分类";
+      this.dialogType = "add";
+      this.dialogVisible = true;
       this.category.parentCid = data.catId;
       this.category.catLevel = data.catLevel + 1;
+
+      this.category.name = '';
+      this.category.catId = null;
+      this.category.icon = '';
+      this.category.productUnit = '';
+      this.category.sort = 0;
+      this.category.showStatus = 1;
     },
 
     //表单的添加方法
-    addCategory(){
-      console.log("提交的三级分类数据",this.category);
+    addCategory() {
+      console.log("提交的三级分类数据", this.category);
       this.$http({
-      url:this.$http.adornUrl('/product/category/save'),
-      method:'post',
-      data: this.$http.adornData(this.category, false)
-      }).then(({data})=>{ 
+        url: this.$http.adornUrl('/product/category/save'),
+        method: 'post',
+        data: this.$http.adornData(this.category, false)
+      }).then(({ data }) => {
         this.$message({
           message: '添加成功',
           type: 'success'
