@@ -21,7 +21,7 @@
 
 
     <el-tree :data="menus" :props="defaultProps" @node-click="handleNodeClick" :expand-on-click-node="false"
-      :show-checkbox="true" node-key="catId" :default-expanded-keys="expandedKey">
+      :show-checkbox="true" node-key="catId" :default-expanded-keys="expandedKey" :draggable="true" :allow-drop="allowDrop">
       <!-- node代表当前结点（是否展开等信息，element-ui自带属性），data是结点数据，是自己的数据。 -->
       <span class="custom-tree-node" slot-scope="{ node, data }">
         <span>{{ node.label }}</span>
@@ -48,6 +48,7 @@ export default {
   name: 'category',
   data() {
     return {
+      maxLevel: 1, //用来记录当前节点的最大深度
       title: '',//对话框的标题
       dialogType: "",//add,edit
       category: {
@@ -74,6 +75,38 @@ export default {
 
 
   methods: {
+    
+    //拖动节点定义
+    allowDrop(draggingNode, dropNode, type) {
+      console.log("allowDrag:", draggingNode, dropNode, type);
+      //节点的最大深度
+      this.countNodeLevel(draggingNode.data);
+      console.log("level:", this.maxLevel);
+      //当前节点的深度
+      let deep = (this.maxLevel - draggingNode.data.catLevel) + 1;
+      console.log(deep)
+      if (type == "inner") {
+        return (deep + dropNode.level) <= 3;
+      } else {
+        return (deep + dropNode.parent.level) <= 3;
+      }
+    },
+
+    //计算当前节点的最大深度
+    countNodeLevel(node) {
+      //找到所有的子节点，求出最大深度
+      if (node.children != null && node.children.length > 0) {
+        for (let i = 0; i < node.children.length; i++) {
+          if (node.children[i].catLevel > this.maxLevel) {
+            this.maxLevel = node.children[i].catLevel;
+          }
+          this.countNodeLevel(node.children[i]);
+        }
+      }
+    },
+
+
+
     //提交表单的方法
     submitData() {
       if (this.dialogType == "add") {
