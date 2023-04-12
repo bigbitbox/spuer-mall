@@ -19,9 +19,11 @@
       </span>
     </el-dialog>
 
+    <el-switch v-model="draggable" active-text="开启拖拽" inactive-text="关闭拖拽"></el-switch>
+    <el-button v-if="draggable" type="primary" @click="batchSave">批量保存</el-button>
 
     <el-tree :data="menus" :props="defaultProps" @node-click="handleNodeClick" :expand-on-click-node="false"
-      :show-checkbox="true" node-key="catId" :default-expanded-keys="expandedKey" :draggable="true"
+      :show-checkbox="true" node-key="catId" :default-expanded-keys="expandedKey" :draggable="draggable"
       :allow-drop="allowDrop" @node-drop="handleDrop">
       <!-- node代表当前结点（是否展开等信息，element-ui自带属性），data是结点数据，是自己的数据。 -->
       <span class="custom-tree-node" slot-scope="{ node, data }">
@@ -49,7 +51,8 @@ export default {
   name: 'category',
   data() {
     return {
-
+      pCid: [],
+      draggable: false,
       updateNodes: [], //用来记录拖拽后的节点
       maxLevel: 1, //用来记录当前节点的最大深度
       title: '',//对话框的标题
@@ -78,6 +81,27 @@ export default {
 
 
   methods: {
+    //批量保存方法
+    batchSave() {
+      this.$http({
+        url: this.$http.adornUrl('/product/category/update/sort'),
+        method: 'post',
+        data: this.$http.adornData(this.updateNodes, false)
+      }).then(({ data }) => {
+        this.$message({
+          message: '菜单顺序修改成功',
+          type: 'success'
+        });
+        //刷新出菜单
+        this.getMenus();
+        //设置默认展开的菜单
+        this.expandedKey = this.pCid;
+        this.updateNodes = [];
+        this.maxLevel = 0;
+        //this.pCid = 0;
+
+      })
+    },
 
 
 
@@ -95,6 +119,7 @@ export default {
         pCid = dropNode.data.catId;
         sibings = dropNode.childNodes;
       }
+      this.pCid.push(pCid);
 
       //2、当前拖拽节点的最新顺序
       //遍历所有的兄弟节点，如果是拖拽节点，传入（catId，sort，parentCid，catLevel），如果是兄弟节点传入（catId，sort）
@@ -117,26 +142,11 @@ export default {
 
       //3、当前拖拽节点的最新层级
       console.log("updateNodes: ", this.updateNodes);
-      this.$http({
-        url: this.$http.adornUrl('/product/category/update/sort'),
-        method: 'post',
-        data: this.$http.adornData(this.updateNodes, false)
-      }).then(({ data }) => {
-        this.$message({
-          message: '菜单顺序修改成功',
-          type: 'success'
-        });
-        //刷新出菜单
-        this.getMenus();
-        //设置默认展开的菜单
-        this.expandedKey = [pCid];
 
-      })
 
 
       //每次拖拽后把数据清空，否则要修改的节点将会越拖越多
-      this.updateNodes = [],
-        this.maxLevel = 1
+
     },
 
     // 修改拖拽节点的子节点的层级
@@ -151,18 +161,14 @@ export default {
         }
       }
     },
-
-
-
-
     //拖动节点定义
     allowDrop(draggingNode, dropNode, type) {
       console.log("allowDrag:", draggingNode, dropNode, type);
       //节点的最大深度
-      this.countNodeLevel(draggingNode.data);
+      this.countNodeLevel(draggingNode);
       console.log("level:", this.maxLevel);
       //当前节点的深度
-      let deep = (this.maxLevel - draggingNode.data.catLevel) + 1;
+      let deep = Math.abs(this.maxLevel - draggingNode.level) + 1;
       console.log(deep)
       if (type == "inner") {
         return (deep + dropNode.level) <= 3;
@@ -174,12 +180,12 @@ export default {
     //计算当前节点的最大深度
     countNodeLevel(node) {
       //找到所有的子节点，求出最大深度
-      if (node.children != null && node.children.length > 0) {
-        for (let i = 0; i < node.children.length; i++) {
-          if (node.children[i].catLevel > this.maxLevel) {
-            this.maxLevel = node.children[i].catLevel;
+      if (node.childNodes != null && node.childNodes.length > 0) {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          if (node.childNodes[i].level > this.maxLevel) {
+            this.maxLevel = node.childNodes[i].level;
           }
-          this.countNodeLevel(node.children[i]);
+          this.countNodeLevel(node.childNodes[i]);
         }
       }
     },
